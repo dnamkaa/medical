@@ -1,8 +1,6 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
-const nodemailer = require('nodemailer');
-const axios = require('axios');
 
 // Initialize Express app
 const app = express();
@@ -25,37 +23,15 @@ const medicalRecordSchema = new mongoose.Schema({
 
 const MedicalRecord = mongoose.model('MedicalRecord', medicalRecordSchema);
 
-// Define the User schema and model
-const userSchema = new mongoose.Schema({
-  email: { type: String, required: true },
-  otp: { type: String, required: true },
-});
-
-const User = mongoose.model('User', userSchema);
-
 // Login endpoint
-app.post('/login', async (req, res) => {
+app.post('/login', (req, res) => {
   const { email } = req.body;
 
   try {
-    // Check if the user already exists
-    let user = await User.findOne({ email });
+    // Generate a token
+    const token = generateToken(email);
 
-    // Generate OTP and send it to the user's email
-    const otp = generateOTP();
-    await sendOTPByEmail(email, otp);
-
-    if (!user) {
-      // Create a new user if it doesn't exist
-      user = new User({ email, otp });
-    } else {
-      // Update the existing user's OTP
-      user.otp = otp;
-    }
-
-    await user.save();
-
-    res.json({ message: 'OTP sent successfully' });
+    res.json({ token });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Internal server error' });
@@ -63,16 +39,7 @@ app.post('/login', async (req, res) => {
 });
 
 // Medical Records endpoint
-app.get('/medical-records/:otp', async (req, res) => {
-  // Verify the OTP received from the client
-  const { email } = req.query;
-  const { otp } = req.params;
-  const user = await User.findOne({ email });
-
-  if (!user || !user.otp || user.otp !== otp) {
-    return res.status(403).json({ message: 'Invalid OTP' });
-  }
-
+app.get('/medical-records', authenticateToken, async (req, res) => {
   try {
     // Fetch the medical records from the database
     const medicalRecords = await MedicalRecord.find();
@@ -84,65 +51,38 @@ app.get('/medical-records/:otp', async (req, res) => {
   }
 });
 
-// OTP endpoint to receive the OTP via HTTP
-app.post('/otp', (req, res) => {
-  const { email, otp } = req.body;
+// Middleware function to authenticate the token
+function authenticateToken(req, res, next) {
+  // Get the token from the Authorization header
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
 
-  // Handle the received OTP as desired
-  console.log('Received OTP:', otp);
+  if (!token) {
+    return res.status(401).json({ message: 'Missing authorization token' });
+  }
 
-  res.status(200).json({ message: 'OTP received successfully' });
-});
+  // Verify the token
+  jwt.verify(token, 'Nana', (err, decoded) => {
+    if (err) {
+      return res.status(403).json({ message: 'Invalid token' });
+    }
+
+    // Pass the decoded token payload to the next middleware
+    req.user = decoded;
+    next();
+  });
+}
+
+// Helper function to generate a JWT token
+function generateToken(email) {
+  const payload = {
+    email,
+  };
+
+  return jwt.sign(payload, 'Nana');
+}
 
 // Start the server
 app.listen(3002, () => {
   console.log('Server listening on port 3002');
 });
-
-// Helper function to generate OTP
-function generateOTP() {
-  const digits = '0123456789';
-  let otp = '';
-  for (let i = 0; i < 6; i++) {
-    otp += digits[Math.floor(Math.random() * 10)];
-  }
-
-  return otp;
-}
-
-// Helper function to send OTP by email
-async function sendOTPByEmail(email, otp) {
-  try {
-    // Console log the OTP
-    console.log('OTP:', otp);
-
-    // Create a nodemailer transporter
-    const transporter = nodemailer.createTransport({
-      service: 'Gmail',
-      auth: {
-        user: 'dnamkaa@gmail.com',
-        pass: 'hemedi19',
-      },
-    });
-
-    // Define the email options
-    const mailOptions = {
-      from: 'dnamkaa@gmail.com',
-      to: email,
-      subject: 'OTP Verification',
-      text: `Your OTP: ${otp}`,
-    };
-
-    // Send the email
-    await transporter.sendMail(mailOptions);
-    console.log('Email sent successfully');
-
-    // Send the OTP via HTTP to another endpoint
-    const otpEndpoint = 'http://localhost:3002/otp'; // Replace with your desired endpoint URL
-
-    await axios.post(otpEndpoint, { email, otp });
-    console.log('OTP sent via HTTP to another endpoint');
-  } catch (error) {
-    console.error('Error sending email:', error);
-  }
-}

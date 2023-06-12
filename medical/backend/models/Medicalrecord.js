@@ -13,7 +13,7 @@ const medicalRecordSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-  nationalID: {
+  nationalId: {
     type: String,
     required: true,
   },

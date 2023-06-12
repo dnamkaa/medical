@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const MedicalRecord = require('../models/Medicalrecord');
+const MedicalRecord = require('./medicalRecord');
 
 // Define routes for CRUD operations
-router.get('/', async (req, res) => {
+router.get('/', authenticateToken, async (req, res) => {
   try {
     const medicalRecords = await MedicalRecord.find();
     res.json(medicalRecords);
@@ -12,14 +12,15 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', authenticateToken, async (req, res) => {
   try {
-    const { name, age, gender, nationalId, report } = req.body;
+    const { name, age, gender, nationalId, email, report } = req.body;
     const medicalRecord = new MedicalRecord({
       name,
       age,
       gender,
       nationalId,
+      email,
       report,
     });
     await medicalRecord.save();
@@ -29,14 +30,14 @@ router.post('/', async (req, res) => {
   }
 });
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, age, gender, nationalId, report } = req.body;
+    const { name, age, gender, nationalId, email, report } = req.body;
 
     const updatedMedicalRecord = await MedicalRecord.findByIdAndUpdate(
       id,
-      { name, age, gender, nationalId, report },
+      { name, age, gender, nationalId, email, report },
       { new: true }
     );
 
@@ -46,7 +47,7 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -57,5 +58,27 @@ router.delete('/:id', async (req, res) => {
     res.status(400).json({ error: err.message });
   }
 });
+
+// Middleware function to authenticate the token
+function authenticateToken(req, res, next) {
+  // Get the token from the Authorization header
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ message: 'Missing authorization token' });
+  }
+
+  // Verify the token
+  jwt.verify(token, secretKey, (err, decoded) => {
+    if (err) {
+      return res.status(403).json({ message: 'Invalid token' });
+    }
+
+    // Pass the decoded token payload to the next middleware
+    req.user = decoded;
+    next();
+  });
+}
 
 module.exports = router;
