@@ -1,68 +1,83 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
+import Box from '@mui/material/Box';
+import Card from '@mui/material/Card';
+import CardActions from '@mui/material/CardActions';
+import CardContent from '@mui/material/CardContent';
+import Button from '@mui/material/Button';
+import Typography from '@mui/material/Typography';
+import TextField from '@mui/material/TextField';
 
-const Login = ({ history }) => {
+const Login = () => {
   const [email, setEmail] = useState('');
-  const [otp, setOtp] = useState('');
-  const [error, setError] = useState(null);
-  const [showOtpField, setShowOtpField] = useState(false);
-
-  const handleEmailChange = (e) => {
-    setEmail(e.target.value);
-  };
-
-  const handleOtpChange = (e) => {
-    setOtp(e.target.value);
-  };
+  const [password, setPassword] = useState('');
+  const navigate = useNavigate();
 
   const handleLogin = async (e) => {
     e.preventDefault();
 
     try {
-      const response = await axios.post('http://localhost:3002/login', { email });
-      setShowOtpField(true);
-      setError(null);
-    } catch (error) {
-      setError('Invalid email');
-    }
-  };
+      const response = await axios.post('http://localhost:3002/login', {
+        email,
+        password,
+      });
 
-  const handleOtpVerification = async (e) => {
-    e.preventDefault();
-
-    try {
-      const response = await axios.post('http://localhost:3002/verify-otp', { email, otp });
-      const { token } = response.data;
-      localStorage.setItem('token', token);
-      setError(null);
-      history.push('/medical-records');
+      // Login successful
+      console.log(response.data.message);
+      // Redirect to dashboard
+      navigate('/dashboard');
     } catch (error) {
-      setError('Invalid OTP');
+      // Incorrect password or user not found
+      console.error(error.response.data.error);
     }
   };
 
   return (
-    <div>
-      <h1>Login</h1>
-      {error && <p>{error}</p>}
-      {!showOtpField ? (
-        <form onSubmit={handleLogin}>
+    <Card sx={{ minWidth: 275 }}>
+      <CardContent>
+        <center>
           <div>
-            <label htmlFor="email">Email:</label>
-            <input type="email" id="email" value={email} onChange={handleEmailChange} required />
+            <h2>Login</h2>
+            <form onSubmit={handleLogin}>
+              <div>
+                {/* <label>Email:</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                /> */}
+                <TextField
+                  id="outlined-basic"
+                  label="email"
+                  variant="outlined"
+                  onChange={(e) => setEmail(e.target.value)}
+                  value={email}
+
+                />
+
+              </div>
+              <div>
+                {/* <label>Password:</label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                /> */}
+                <TextField
+                  type="password"
+                  label="Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  variant="outlined"
+                />
+              </div>
+              <button type="submit">Login</button>
+            </form>
           </div>
-          <button type="submit">Send OTP</button>
-        </form>
-      ) : (
-        <form onSubmit={handleOtpVerification}>
-          <div>
-            <label htmlFor="otp">OTP:</label>
-            <input type="text" id="otp" value={otp} onChange={handleOtpChange} required />
-          </div>
-          <button type="submit">Verify OTP</button>
-        </form>
-      )}
-    </div>
+        </center>
+      </CardContent>
+    </Card>
   );
 };
 
